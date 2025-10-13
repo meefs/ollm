@@ -2,7 +2,7 @@ import os, requests, zipfile
 import torch
 from transformers import AutoTokenizer, AutoProcessor
 from .utils import Stats, file_get_contents
-from .gds_loader import GDSWeights, MoEWeightsLoader2, Gemma3Loader
+from .gds_loader import GDSWeights, DenseWeightsLoader, MoEWeightsLoader, SingleDenseWeightsLoader
 from .kvcache import KVCache
 
 class Inference:
@@ -15,10 +15,7 @@ class Inference:
 	def download_and_unpack(self, models_dir: str):
 		os.makedirs(models_dir, exist_ok=True)
 		urls = {
-			"llama3-1B-chat": "https://ollm.s3.us-east-1.amazonaws.com/models/llama3-1B-chat.zip",
-			"llama3-3B-chat": "https://ollm.s3.us-east-1.amazonaws.com/models/llama3-3B-chat.zip",
-			"llama3-8B-chat": "https://ollm.s3.us-east-1.amazonaws.com/models/llama3-8B-chat.zip",
-			"gpt-oss-20B":    "https://ollm.s3.us-east-1.amazonaws.com/models/gpt-oss-20B.zip"
+			"gpt-oss-20B": "https://ollm.s3.us-east-1.amazonaws.com/models/gpt-oss-20B.zip"
 		}
 		url = urls[self.model_id]
 		
@@ -46,7 +43,14 @@ class Inference:
 	
 	def hf_download(self, model_dir):
 		from huggingface_hub import snapshot_download
-		urls = {"qwen3-next-80B": "Qwen/Qwen3-Next-80B-A3B-Instruct", "gemma3-12B":"google/gemma-3-12b-it", "voxtral-small-24B":"mistralai/Voxtral-Small-24B-2507"}
+		urls = {
+			"llama3-1B-chat": "meta-llama/Llama-3.2-1B-Instruct",
+			"llama3-3B-chat": "meta-llama/Llama-3.2-3B-Instruct",
+			"llama3-8B-chat": "meta-llama/Llama-3.1-8B-Instruct",
+			"qwen3-next-80B": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+			"gemma3-12B": "google/gemma-3-12b-it",
+			"voxtral-small-24B": "mistralai/Voxtral-Small-24B-2507"
+		}
 		url = urls[self.model_id]
 		print(f"Downloading {url} ...")
 		snapshot_download(
@@ -63,27 +67,27 @@ class Inference:
 		
 		model_dir = os.path.join(models_dir, self.model_id)
 		if os.path.exists(model_dir)==False or force_download==True:
-			if self.model_id in ["qwen3-next-80B", "gemma3-12B", "voxtral-small-24B"]:
-				self.hf_download(model_dir)
-			else:
+			if self.model_id in ["gpt-oss-20B"]:
 				self.download_and_unpack(models_dir)
+			else:
+				self.hf_download(model_dir)
 		
 		print("loading model from", model_dir)
 		if self.model_id=="qwen3-next-80B":
 			from . import qwen3_next
-			qwen3_next.loader = MoEWeightsLoader2(model_dir)
+			qwen3_next.loader = MoEWeightsLoader(model_dir)
 			qwen3_next.stats = self.stats
 			self.model = qwen3_next.MyQwen3NextForCausalLM.from_pretrained(model_dir, torch_dtype=torch.bfloat16, device_map="cpu", attn_implementation="flash_attention_2", low_cpu_mem_usage=True, ignore_mismatched_sizes=True)
 		elif self.model_id=="gemma3-12B":
 			from . import gemma3
-			gemma3.loader = Gemma3Loader(model_dir)
+			gemma3.loader = DenseWeightsLoader(model_dir)
 			gemma3.stats = self.stats
 			automodel = gemma3.MyGemma3ForConditionalGeneration if self.multimodality else gemma3.MyGemma3ForCausalLM
 			self.model = automodel.from_pretrained(model_dir, torch_dtype=torch.bfloat16, device_map="cpu", attn_implementation="flash_attention_2", low_cpu_mem_usage=True, ignore_mismatched_sizes=True)
 			self.processor = AutoProcessor.from_pretrained(model_dir)
 		elif self.model_id=="voxtral-small-24B":
 			from . import voxtral
-			voxtral.loader = Gemma3Loader(model_dir)
+			voxtral.loader = DenseWeightsLoader(model_dir)
 			voxtral.stats = self.stats
 			self.model = voxtral.MyVoxtralForConditionalGeneration.from_pretrained(model_dir, torch_dtype="auto", device_map="cpu", attn_implementation="flash_attention_2", low_cpu_mem_usage=True, ignore_mismatched_sizes=True)
 			self.processor = AutoProcessor.from_pretrained(model_dir)
@@ -95,10 +99,9 @@ class Inference:
 			self.model = gpt_oss.MyGptOssForCausalLM.from_pretrained(model_dir, torch_dtype=torch.bfloat16, device_map="cpu", low_cpu_mem_usage=True, ignore_mismatched_sizes=True)		
 		else:
 			from . import llama
-			llama.loader = GDSWeights(os.path.join(model_dir, "gds_export"))
+			llama.loader = SingleDenseWeightsLoader(model_dir) #GDSWeights(os.path.join(model_dir, "gds_export"))
 			llama.stats = self.stats			
-			self.model = llama.MyLlamaForCausalLM.from_pretrained(model_dir, torch_dtype=torch.float16, device_map="cpu", attn_implementation="flash_attention_2", low_cpu_mem_usage=True, ignore_mismatched_sizes=True)
-			self.model.clean_layers_weights()
+			self.model = llama.MyLlamaForCausalLM.from_pretrained(model_dir, torch_dtype=torch.bfloat16, device_map="cpu", attn_implementation="flash_attention_2", low_cpu_mem_usage=True, ignore_mismatched_sizes=True)
 
 		self.model.eval()
 		self.model.to(self.device)

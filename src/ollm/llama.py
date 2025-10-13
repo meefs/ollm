@@ -84,7 +84,7 @@ class MyLlamaMLP(LlamaMLP):
 
 
 
-class loaderLayer:
+class loaderLayer1: #GDSWeights
 	def _layer_param_manifest_names(self) -> dict:		
 		base = f"model.layers.{self.layer_idx}"
 		return {
@@ -120,6 +120,24 @@ class loaderLayer:
 		for attr_path in manifest_map.keys():
 			parent, leaf = _walk_to_parent(self, attr_path)
 			# replace with placeholder (keeps module graph intact)
+			_set_meta_placeholder(parent, leaf)
+
+
+class loaderLayer:
+	def _load_layer_weights(self):
+		t1 = time.perf_counter()
+		base = f"model.layers.{self.layer_idx}."
+		loader.preload_layer_safetensors(base)
+		d = loader.load_dict_to_cuda(base)
+		for attr_path, tensor in d.items():
+			parent, leaf = _walk_to_parent(self, attr_path)
+			_assign_tensor_to_module(parent, leaf, tensor)
+		if stats: stats.set("layer_load", t1)
+			
+	def _unload_layer_weights(self):
+		base = f"model.layers.{self.layer_idx}."
+		for attr_path in loader.manifest[base]:
+			parent, leaf = _walk_to_parent(self, attr_path)
 			_set_meta_placeholder(parent, leaf)
 
 
@@ -187,14 +205,7 @@ class MyLlamaModel(LlamaModel):
 		#============= meine ==============		
 		self.embed_tokens.cpu(); self.parent_lm_head.cpu()		
 
-		for layer_idx, decoder_layer in enumerate(self.layers[: self.config.num_hidden_layers]):						
-			p1 = None # 1NextInThread
-			"""
-			if layer_idx+1 < len(self.layers):
-				p1 = threading.Thread(target=self.layers[layer_idx+1]._load_layer_weights, args=())
-				p1.start()
-			if layer_idx==0: decoder_layer._load_layer_weights()			
-			"""
+		for layer_idx, decoder_layer in enumerate(self.layers[: self.config.num_hidden_layers]):
 			hidden_states = decoder_layer(
 				hidden_states,
 				attention_mask=causal_mask,
@@ -203,8 +214,7 @@ class MyLlamaModel(LlamaModel):
 				cache_position=cache_position,
 				position_embeddings=position_embeddings,
 				**kwargs,
-			)
-			if p1 is not None: p1.join()
+			)			
 
 		hidden_states = self.norm(hidden_states)
 		self.embed_tokens.to(hidden_states.device); self.parent_lm_head.to(hidden_states.device)
@@ -224,8 +234,21 @@ llama_modeling.LlamaDecoderLayer = MyLlamaDecoderLayer
 llama_modeling.LlamaModel = MyLlamaModel
 #===============================================
 
+class oForGeneration: #copied from gemma3 prefix=language_model.
+	def generate(self, **args):
+		with torch.no_grad():			
+			return super().generate(**args)
 
-class MyLlamaForCausalLM(LlamaForCausalLM):
+	def offload_layers_to_cpu(self, layers_num=2):
+		print(f"offloading layers to CPU {layers_num}/{self.num_hidden_layers}...")
+		for layer_idx in range(min(layers_num, self.num_hidden_layers)):
+			base = f"model.layers.{layer_idx}."
+			loader.preload_layer_safetensors(base)
+			loader.offload_dict_to_gpu_cpu(base, gpu=False)		
+		print(f"./finished offloading layers to CPU {layers_num}/{self.num_hidden_layers}")
+
+
+class MyLlamaForCausalLM(LlamaForCausalLM, oForGeneration):
 	def __init__(self, config):
 		super().__init__(config)
 		self.model.parent_lm_head = self.lm_head #link
@@ -234,17 +257,8 @@ class MyLlamaForCausalLM(LlamaForCausalLM):
 	def generate(self, **args):
 		with torch.no_grad():
 			return super().generate(**args)
-	
-	def clean_layers_weights(self, device="cpu"):
-		manifest_map = loader.manifest
-		for name, v in manifest_map.items():
-			if name.startswith("model.layers."):
-				tensor = torch.empty([0], device="cpu")
-				#tensor = torch.empty(v["shape"], dtype=torch.float8_e4m3fn, device="cpu") #[0]
-				parent, leaf = _walk_to_parent(self, name)
-				_assign_tensor_to_module(parent, leaf, tensor)
 
-	def offload_layers_to_cpu(self, layers_num=2):
+	def offload_layers_to_cpu1(self, layers_num=2): #GDSWeights version
 		for layer_idx in range(min(layers_num, self.num_hidden_layers)):			
 			for name, attr in loader.manifest.items():
 				if name.startswith(f"model.layers.{layer_idx}."):
