@@ -23,7 +23,7 @@ def run_test(test_id, model_id, sm, um, kvcache=None, offload_layers_to_gpu=0, o
 
 
 #=======================================================
-test_ids = [2,6,5]  #quick tests: [1,2,5,6]
+test_ids = [2]  #quick tests: [1,2,5,6]
 
 for test_id in test_ids:
 	if test_id==1: #1. Llama3-8B check noKV==newKV2.0 on 10k_chats

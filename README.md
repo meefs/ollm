@@ -1,4 +1,3 @@
-
 <!-- markdownlint-disable MD001 MD041 -->
 <p align="center">
   <picture>
@@ -12,11 +11,12 @@ LLM Inference for Large-Context Offline Workloads
 </h3>
 
 oLLM is a lightweight Python library for large-context LLM inference, built on top of Huggingface Transformers and PyTorch. It enables running models like [gpt-oss-20B](https://huggingface.co/openai/gpt-oss-20b), [qwen3-next-80B](https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Instruct) or [Llama-3.1-8B-Instruct](https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct) on 100k context using ~$200 consumer GPU with 8GB VRAM.  No quantization is used—only fp16/bf16 precision. 
-<p dir="auto"><em>Latest updates (0.5.2)</em> 🔥</p>
+<p dir="auto"><em>Latest updates (1.0.0)</em> 🔥</p>
 <ul dir="auto">
+<li> <code>kvikio</code> and <code>flash-attn</code> are optional now, meaning no hardware restrictions beyond HF transformers</li>
+<li> Llama3 models use original HF files now (make sure to redownload the model using <code>force_download=True</code>)</li>
 <li>Multimodal <b>voxtral-small-24B</b> (audio+text) added. <a href="https://github.com/Mega4alik/ollm/blob/main/example_audio.py">[sample with audio]</a> </li>
 <li>Multimodal <b>gemma3-12B</b> (image+text) added. <a href="https://github.com/Mega4alik/ollm/blob/main/example_image.py">[sample with image]</a> </li>
-<li>qwen3-next-80B DiskCache support added</li>
 <li><b>qwen3-next-80B</b> (160GB model) added with <span style="color:blue">⚡️1tok/2s</span> throughput (our fastest model so far)</li>
 <li>gpt-oss-20B flash-attention-like implementation added to reduce VRAM usage </li>
 <li>gpt-oss-20B chunked MLP added to reduce VRAM usage </li>
@@ -30,9 +30,9 @@ oLLM is a lightweight Python library for large-context LLM inference, built on t
 | [qwen3-next-80B](https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Instruct) | 160 GB (bf16) | 50k | 20 GB | ~190 GB   | ~7.5 GB | 180 GB  |
 | [gpt-oss-20B](https://huggingface.co/openai/gpt-oss-20b) | 13 GB (packed bf16) | 10k | 1.4 GB | ~40 GB   | ~7.3GB | 15 GB  |
 | [gemma3-12B](https://huggingface.co/google/gemma-3-12b-it)  | 25 GB (bf16) | 50k   | 18.5 GB          | ~45 GB   | ~6.7 GB       | 43 GB  |
-| [llama3-1B-chat](https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct)  | 2 GB (fp16) | 100k   | 12.6 GB          | ~16 GB   | ~5 GB       | 15 GB  |
-| [llama3-3B-chat](https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct)  | 7 GB (fp16) | 100k  | 34.1 GB | ~42 GB   | ~5.3 GB     | 42 GB |
-| [llama3-8B-chat](https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct)  | 16 GB (fp16) | 100k  | 52.4 GB | ~71 GB   | ~6.6 GB     | 69 GB  |
+| [llama3-1B-chat](https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct)  | 2 GB (bf16) | 100k   | 12.6 GB          | ~16 GB   | ~5 GB       | 15 GB  |
+| [llama3-3B-chat](https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct)  | 7 GB (bf16) | 100k  | 34.1 GB | ~42 GB   | ~5.3 GB     | 42 GB |
+| [llama3-8B-chat](https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct)  | 16 GB (bf16) | 100k  | 52.4 GB | ~71 GB   | ~6.6 GB     | 69 GB  |
 
 <small>By "Baseline" we mean typical inference without any offloading</small>
 
@@ -50,7 +50,9 @@ Typical use cases include:
 - Process very large log files or threat reports locally
 - Analyze historical chats to extract the most common issues/questions users have
 ---
-Supported **Nvidia GPUs**: Ampere (RTX 30xx, A30, A4000,  A10),  Ada Lovelace (RTX 40xx,  L4), Hopper (H100), and newer
+**Supported GPUs**: NVIDIA (with additional performance benefits from `kvikio` and `flash-attn`), AMD, and Apple Silicon (MacBook).
+
+
 
 ## Getting Started
 
@@ -60,17 +62,20 @@ python3 -m venv ollm_env
 source ollm_env/bin/activate
 ```
 
-Install oLLM with `pip install ollm` or [from source](https://github.com/Mega4alik/ollm):
+Install oLLM with `pip install --no-build-isolation ollm` or [from source](https://github.com/Mega4alik/ollm):
 
 ```bash
 git clone https://github.com/Mega4alik/ollm.git
 cd ollm
-pip install -e .
-pip install kvikio-cu{cuda_version} Ex, kvikio-cu12
+pip install --no-build-isolation -e .
+
+# for Nvidia GPUs with cuda (optional): 
+pip install kvikio-cu{cuda_version} Ex, kvikio-cu12 #speeds up the inference
 ```
 > 💡 **Note**  
 > **voxtral-small-24B** requires additional pip dependencies to be installed as `pip install "mistral-common[audio]"` and `pip install librosa`
 
+Check out the [Troubleshooting](https://github.com/Mega4alik/ollm/wiki/Troubleshooting) in case of any installation issues 
 
 ## Example
 
@@ -96,6 +101,13 @@ or run sample python script as `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 - [gemma3-12B image+text](https://github.com/Mega4alik/ollm/blob/main/example_image.py)
 - [voxtral-small-24B audio+text](https://github.com/Mega4alik/ollm/blob/main/example_audio.py)
 
+
+## Knowledge base
+- [Documentation](https://github.com/Mega4alik/ollm/wiki/Documentation)
+- [Community](https://github.com/Mega4alik/ollm/wiki/Community) articles, video, blogs
+- [Troubleshooting](https://github.com/Mega4alik/ollm/wiki/Troubleshooting)
+
+
 ## Roadmap
 *For visibility of what's coming next (subject to change)*
 - Qwen3-Next quantized version
@@ -105,3 +117,4 @@ or run sample python script as `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 ## Contact us
 If there’s a model you’d like to see supported, feel free to suggest it in the [discussion](https://github.com/Mega4alik/ollm/discussions/4) — I’ll do my best to make it happen.
+

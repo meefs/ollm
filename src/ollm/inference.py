@@ -56,6 +56,7 @@ class Inference:
 			"llama3-1B-chat": "unsloth/Llama-3.2-1B-Instruct", #meta-llama/
 			"llama3-3B-chat": "unsloth/Llama-3.2-3B-Instruct",
 			"llama3-8B-chat": "unsloth/Meta-Llama-3.1-8B-Instruct",
+			"gpt-oss-20B": "AnuarSh/gpt-oss-20B",
 			"qwen3-next-80B": "Qwen/Qwen3-Next-80B-A3B-Instruct",
 			"gemma3-12B": "google/gemma-3-12b-it",
 			"voxtral-small-24B": "mistralai/Voxtral-Small-24B-2507"
@@ -72,7 +73,7 @@ class Inference:
 		
 		model_dir = os.path.join(models_dir, self.model_id)
 		if os.path.exists(model_dir)==False or force_download==True:
-			if self.model_id in ["gpt-oss-20B"]:
+			if self.model_id in ["model-from-S3-zip"]:
 				self.download_and_unpack(models_dir)
 			else:
 				self.hf_download(model_dir)
