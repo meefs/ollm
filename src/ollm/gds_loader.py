@@ -4,19 +4,16 @@ from torch.utils.dlpack import from_dlpack
 #from safetensors.torch import safe_open, load_file
 import struct
 
-import kvikio
-import cupy as cp
+kvikio_available = False
+try:
+	import kvikio
+	import cupy as cp   
+	kvikio_available = True
+except ImportError:
+    print("Warning: kvikio is not imported")
 
+# shared objects
 stats = None
-
-DTYPE_MAP = {
-	"float16": cp.float16,
-	"bfloat16": cp.float16, #cp.dtype('bfloat16'),
-	"float32": cp.float32,
-	"float64": cp.float64,
-	"int8": cp.int8,
-	"int32": cp.int32,
-}
 
 class GDSWeights:
 	def __init__(self, path: str, device="cuda:0"):
@@ -40,8 +37,18 @@ class GDSWeights:
 		else: #kvikio, numpy
 			return self.load_from_disk_to_cuda(path, shape, dtype)
 
+	def get_dtype(self, dtype):
+		return {
+			"float16": cp.float16,
+			"bfloat16": cp.float16, #cp.dtype('bfloat16'),
+			"float32": cp.float32,
+			"float64": cp.float64,
+			"int8": cp.int8,
+			"int32": cp.int32,
+		}[dtype]
+
 	def load_from_disk_to_cuda(self, path, shape, dtype): #str, list, str
-		cp_dtype = DTYPE_MAP[dtype]
+		cp_dtype = self.get_dtype(dtype)
 		n_elems = 1
 		for s in shape:
 			n_elems *= s
@@ -173,48 +180,6 @@ def convert_moe_packed_tensors( #copied from transformers/integrations/mxfp4.py
 
 #=========================================================================
 
-class asyncCudaLoader: #it's slow, maybe need to adapt for experts common load
-	def async_move_to_gpu(self, tensor, stream=None):		
-		if not tensor.is_pinned():
-			try:
-				tensor = tensor.pin_memory()
-			except Exception:
-				# some dtypes or storages may not support pinning; fall back gracefully
-				pass
-
-		if stream is None:
-			return tensor.to(device=self.device, non_blocking=True)
-
-		with torch.cuda.stream(stream):
-			dst = tensor.to(device=self.device, non_blocking=True)
-		return dst
-
-	def load_pt_to_gpu(self, pt_path, max_workers=4):
-		gpu_state = {}
-		obj = torch.load(pt_path, map_location="cpu")		
-		streams = [torch.cuda.Stream(device=self.device) for _ in range(max_workers)]
-		executor = ThreadPoolExecutor(max_workers=max_workers)
-		
-		def handle_item(key, val, stream_idx):
-			stream = streams[stream_idx % len(streams)]
-			return self.async_move_to_gpu(val, stream=stream)
-
-		futures, idx = {}, 0
-		for k, v in obj.items():
-			futures[k] = executor.submit(handle_item, k, v, idx)
-			idx += 1
-
-		# collect results
-		for k, fut in futures.items(): gpu_state[k] = fut.result()
-
-		# synchronize all streams to ensure transfers are finished
-		for s in streams: s.synchronize()
-		executor.shutdown(wait=True)
-		return gpu_state
-
-
-#=========================================================================
-
 class SafeTensorReader: #safetensors replacement because its mmap is killing the RAM
 	def __init__(self, path):
 		self.path = path		
@@ -254,7 +219,6 @@ class SafeTensorReaderGPU:
 		# Open with kvikio (GPU-aware file handle)
 		self._fp = kvikio.CuFile(path, "rb")
 
-
 	def __enter__(self):
 		return self
 
@@ -290,6 +254,12 @@ class SafeTensorReaderGPU:
 		torch_tensor = torch_tensor.view(dtype).reshape(shape)
 		return torch_tensor
 
+
+def get_optimal_safetensor_reader(filepath, device=None):
+	if kvikio_available:
+		return SafeTensorReaderGPU(filepath, device=device)
+	else:
+		return SafeTensorReader(filepath)
 
 #=========================================================================
 
@@ -338,7 +308,7 @@ class DenseWeightsLoader:
 		for attr_path, filename in self.manifest[base].items():
 			if filename not in self.safetensors:
 				filepath = os.path.join(self.path, filename)
-				self.safetensors[filename] = SafeTensorReaderGPU(filepath, device=self.device)
+				self.safetensors[filename] = get_optimal_safetensor_reader(filepath, device=self.device)
 
 
 class SingleDenseWeightsLoader(DenseWeightsLoader):
@@ -349,7 +319,7 @@ class SingleDenseWeightsLoader(DenseWeightsLoader):
 		self.manifest, self.safetensors = {}, {}
 		filename = "model.safetensors"
 		filepath = os.path.join(self.path, filename)
-		self.safetensors[filename] = SafeTensorReaderGPU(filepath, device=self.device)
+		self.safetensors[filename] = get_optimal_safetensor_reader(filepath, device=self.device)
 		for manifest_name in self.safetensors[filename].keys():
 			match1 = re.search(r"(model\.layers\.\d+\.)", manifest_name)
 			if match1:
@@ -390,7 +360,7 @@ class MoEWeightsLoader(DenseWeightsLoader): #qwen3_next safetensors
 				for attr_path, filename in self.manifest[base1].items():
 					if filename not in self.safetensors:
 						filepath = os.path.join(self.path, filename)
-						self.safetensors[filename] = SafeTensorReader(filepath) #safe_open(filepath, framework="pt")
+						self.safetensors[filename] = get_optimal_safetensor_reader(filepath) #safe_open(filepath, framework="pt")
 
 
 #=========================================================================

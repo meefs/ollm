@@ -7,7 +7,7 @@ def run_test(test_id, model_id, sm, um, kvcache=None, offload_layers_to_gpu=0, o
 	o.ini_model(models_dir=f"/media/mega4alik/ssd/models/", force_download=False)
 	if offload_layers_to_gpu: o.offload_layers_to_gpu_cpu(gpu_layers_num=offload_layers_to_gpu, cpu_layers_num=offload_layers_to_cpu)
 	elif offload_layers_to_cpu>0: o.offload_layers_to_cpu(layers_num=offload_layers_to_cpu)
-	if kvcache=="disk": past_key_values = o.DiskCache(cache_dir="/media/mega4alik/ssd2/kv_cache/")
+	if kvcache=="disk": past_key_values = o.DiskCache(cache_dir="/media/mega4alik/ssd/kv_cache/")
 	else: past_key_values=None
 	model, tokenizer, device = o.model, o.tokenizer, o.device
 
@@ -23,7 +23,7 @@ def run_test(test_id, model_id, sm, um, kvcache=None, offload_layers_to_gpu=0, o
 
 
 #=======================================================
-test_ids = [1]
+test_ids = [2,6,5]  #quick tests: [1,2,5,6]
 
 for test_id in test_ids:
 	if test_id==1: #1. Llama3-8B check noKV==newKV2.0 on 10k_chats
