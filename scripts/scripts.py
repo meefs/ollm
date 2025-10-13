@@ -30,19 +30,16 @@ def safetensors_vs_ptfiles():
     out2 = [tensors[f"layer1.expert{eid}"] for eid in expert_ids]
     print("Safetensors load time:", time.time() - t0, "sec")    
 
-
-
-
 #=================================
 
 def hf_push_to_hub():
-    from huggingface_hub import HfApi, HfFolder, Repository, create_repo    
-    repo_name = "AnuarSh/qwen3-next-80B"
-    #create_repo(repo_name, private=False)
+    from huggingface_hub import HfApi, HfFolder, Repository, create_repo
+    repo_name = "AnuarSh/gpt-oss-20B"
+    create_repo(repo_name, private=False)
 
     api = HfApi()
     api.upload_large_folder( #upload_folder
-        folder_path="/media/mega4alik/ssd2/models/qwen3_next/",
+        folder_path="/media/mega4alik/ssd/models/gpt-oss-20B/",
         repo_id=repo_name,
         repo_type="model",
     )
@@ -50,7 +47,5 @@ def hf_push_to_hub():
 #=================================
 
 if __name__=="__main__":
-	#hf_push_to_hub()
-    #safetensors_vs_ptfiles()
-    #merge_safetensors_files("/media/mega4alik/ssd2/models/qwen3_next/", "/home/mega4alik/Desktop/models/model2.safetensors")
-
+	hf_push_to_hub()
+    
