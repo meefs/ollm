@@ -157,7 +157,8 @@ class PeftInference(Inference):
 		self.load_model(model_dir) #peft_config.base_model_name_or_path
 		peft_config = LoraConfig.from_pretrained(adapter_dir)
 		self.model = get_peft_model(self.model, peft_config)   # this creates LoRA modules with grad enabled
-		self.model.load_adapter(adapter_dir, adapter_name="default")		
+		self.model.load_adapter(adapter_dir, adapter_name="default")
+		#self.model = self.model.model #?
 
 	def is_sharded(self, model_dir):
 		files = os.listdir(model_dir)
