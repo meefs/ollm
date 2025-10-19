@@ -137,7 +137,7 @@ class Inference:
 
 
 class PeftInference(Inference):
-	def __init__(self, model_dir, adapter_dir=None, device="cuda:0", logging=True, multimodality = False):
+	def __init__(self, model_dir, adapter_dir=None, device="cuda:0", logging=True, multimodality=False):
 		from peft import PeftModel, LoraConfig, get_peft_model
 		self.device = torch.device(device)
 		self.stats = Stats() if logging else None
@@ -155,10 +155,11 @@ class PeftInference(Inference):
 			
 		self.multimodality = multimodality
 		self.load_model(model_dir) #peft_config.base_model_name_or_path
-		peft_config = LoraConfig.from_pretrained(adapter_dir)
-		self.model = get_peft_model(self.model, peft_config)   # this creates LoRA modules with grad enabled
-		self.model.load_adapter(adapter_dir, adapter_name="default")
-		#self.model = self.model.model #?
+		if adapter_dir:
+			peft_config = LoraConfig.from_pretrained(adapter_dir)
+			self.model = get_peft_model(self.model, peft_config)   # this creates LoRA modules with grad enabled
+			self.model.load_adapter(adapter_dir, adapter_name="default")
+			#self.model = self.model.model #?
 
 	def is_sharded(self, model_dir):
 		files = os.listdir(model_dir)
