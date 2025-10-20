@@ -76,13 +76,15 @@ class loaderLayer:
 		d = loader.load_dict_to_cuda(base)
 		for attr_path, tensor in d.items():
 			parent, leaf = _walk_to_parent(self, attr_path)
+			if hasattr(parent, "base_layer"): parent = parent.base_layer #peft lora
 			_assign_tensor_to_module(parent, leaf, tensor)
 		if stats: stats.set("layer_load", t1)
-			
+
 	def _unload_layer_weights(self):
 		base = f"model.layers.{self.layer_idx}."
 		for attr_path in loader.manifest[base]:
 			parent, leaf = _walk_to_parent(self, attr_path)
+			if hasattr(parent, "base_layer"): parent = parent.base_layer #peft lora
 			_set_meta_placeholder(parent, leaf)
 
 
