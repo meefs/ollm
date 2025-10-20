@@ -136,7 +136,7 @@ class Inference:
 
 
 
-class PeftInference(Inference):
+class AutoInference(Inference):
 	def __init__(self, model_dir, adapter_dir=None, device="cuda:0", logging=True, multimodality=False):
 		from peft import PeftModel, LoraConfig, get_peft_model
 		self.device = torch.device(device)
