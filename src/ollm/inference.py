@@ -148,7 +148,7 @@ class AutoInference(Inference):
 			self.model_id = "llama3-8B-chat" if sharded else "llama3-1B-chat"
 		elif arc == "Gemma3ForConditionalGeneration":
 			self.model_id = "gemma3-12B"
-			multimodality = True
+			#multimodality = True
 		elif arc == "Gemma3ForCausalLM": self.model_id = "gemma3-12B"
 		else:
 			raise ValueError("This model type is not supported")
