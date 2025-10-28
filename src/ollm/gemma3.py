@@ -15,20 +15,26 @@ loader, stats = None, None
 from transformers.models.gemma3.modeling_gemma3 import Gemma3MLP, Gemma3DecoderLayer, Gemma3Config, Gemma3Model, Gemma3TextModel, Gemma3ForCausalLM, Gemma3ForConditionalGeneration, Gemma3RMSNorm, create_sliding_window_causal_mask, create_causal_mask, repeat_kv, TransformersKwargs, Cache, BaseModelOutputWithPast, Gemma3ModelOutputWithPast
 
 class loaderLayer: #gemma3 specific
+	def get_base(self, base):
+		if base in loader.manifest: return base
+		return "language_model."+base
+
 	def _load_layer_weights(self):
 		t1 = time.perf_counter()
-		base = f"language_model.model.layers.{self.layer_idx}."
+		base = self.get_base(f"model.layers.{self.layer_idx}.")
 		loader.preload_layer_safetensors(base)
 		d = loader.load_dict_to_cuda(base)
 		for attr_path, tensor in d.items():
 			parent, leaf = _walk_to_parent(self, attr_path)
+			if hasattr(parent, "base_layer"): parent = parent.base_layer #peft lora
 			_assign_tensor_to_module(parent, leaf, tensor)
 		if stats: stats.set("layer_load", t1)
-			
+
 	def _unload_layer_weights(self):
-		base = f"language_model.model.layers.{self.layer_idx}."
+		base = self.get_base(f"model.layers.{self.layer_idx}.")
 		for attr_path in loader.manifest[base]:
 			parent, leaf = _walk_to_parent(self, attr_path)
+			if hasattr(parent, "base_layer"): parent = parent.base_layer #peft lora
 			_set_meta_placeholder(parent, leaf)
 
 
@@ -84,7 +90,7 @@ modeling.Gemma3TextModel = MyGemma3TextModel
 modeling.Gemma3Model = MyGemma3Model
 #===============================================
 
-class oForGeneration:
+class oForGeneration(loaderLayer):
 	def generate(self, **args):
 		with torch.no_grad():			
 			return super().generate(**args)
@@ -92,7 +98,7 @@ class oForGeneration:
 	def offload_layers_to_cpu(self, layers_num=2):
 		print(f"offloading layers to CPU {layers_num}/{self.num_hidden_layers}...")
 		for layer_idx in range(min(layers_num, self.num_hidden_layers)):
-			base = f"language_model.model.layers.{layer_idx}."
+			base = self.get_base(f"model.layers.{layer_idx}.")
 			loader.preload_layer_safetensors(base)
 			loader.offload_dict_to_gpu_cpu(base, gpu=False)		
 		print(f"./finished offloading layers to CPU {layers_num}/{self.num_hidden_layers}")
