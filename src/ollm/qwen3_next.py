@@ -17,9 +17,9 @@ loader, stats = None, None
 from transformers.models.qwen3_next.modeling_qwen3_next import Qwen3NextMLP, Qwen3NextSparseMoeBlock, Qwen3NextDecoderLayer, Qwen3NextConfig, Qwen3NextModel, Qwen3NextForCausalLM, Qwen3NextDynamicCache, Qwen3NextRMSNorm, create_causal_mask, repeat_kv, MoeModelOutputWithPast, MoeCausalLMOutputWithPast, TransformersKwargs, Cache
 
 class Qwen3NextDiskCache(Qwen3NextDynamicCache, oCache):
-	def __init__(self, config, cache_dir="./kv_cache", stats=None):
+	def __init__(self, config, cache_dir="./kv_cache", device="cuda:0", stats=None):
 		super().__init__(config)
-		self.ini_ocache(cache_dir, stats)
+		self.ini_ocache(cache_dir, device, stats)
 		self.seq_lengths = [0 for _ in range(len(self.key_cache))]
 
 	def get_seq_length(self, layer_idx: Optional[int] = 0) -> int:

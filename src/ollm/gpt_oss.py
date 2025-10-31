@@ -10,7 +10,11 @@ from typing import Callable, Optional, Tuple, Union, Dict, Any, Iterable, List, 
 from transformers import GptOssForCausalLM, AutoTokenizer, AutoModelForCausalLM
 from .utils import _walk_to_parent, _assign_tensor_to_module, _set_meta_placeholder
 from .gds_loader import GDSWeights
-from .gpt_oss_attention import attention as flash_attention
+
+try:
+	from .gpt_oss_attention import attention as flash_attention
+except ImportError:	
+	flash_attention = None
 
 #global vars
 loader, stats = None, None
@@ -215,7 +219,7 @@ def my_eager_attention_forward(
 	
 	# Flash-attention
 	offset, n_ctx = min(key.shape[2] - query.shape[2], sliding_window if sliding_window else 999), query.shape[2]
-	if offset==0: #use FA only for first generation
+	if flash_attention is not None and offset==0: #use FA only for first generation
 		#print("offset", query.shape, key.shape, offset, "n_ctx:", n_ctx, "sliding_window:", sliding_window, "scaling:", scaling, kwargs)
 		start_q = torch.LongTensor([offset]).to(query.device)
 		t = flash_attention(

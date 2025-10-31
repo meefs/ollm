@@ -130,9 +130,9 @@ class Inference:
 			return None
 		elif self.model_id=="qwen3-next-80B":
 			from .qwen3_next import Qwen3NextDiskCache
-			return Qwen3NextDiskCache(self.model.config, cache_dir=cache_dir, stats=self.stats)
+			return Qwen3NextDiskCache(self.model.config, cache_dir=cache_dir, device=self.device, stats=self.stats)
 		else:
-			return KVCache(cache_dir=cache_dir, stats=self.stats) #config=?
+			return KVCache(cache_dir=cache_dir, device=self.device, stats=self.stats)
 
 
 

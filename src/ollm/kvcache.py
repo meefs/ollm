@@ -4,19 +4,20 @@ from transformers import DynamicCache
 from typing import Callable, Optional, Tuple, Union, Dict, Any, Iterable, List
 
 class oCache:	
-	def ini_ocache(self, cache_dir, stats):
+	def ini_ocache(self, cache_dir, device, stats):
 		if not cache_dir: raise Error("cache_dir can not be empty. If you are trying to not use DiskCache, simply set past_key_values=None. This will use default DynamicCache")
 		self.cache_folder = os.path.join(cache_dir, "kv_cache")
 		self.key_cache2, self.value_cache2 = [], []
 		if os.path.exists(self.cache_folder): shutil.rmtree(self.cache_folder)
 		os.makedirs(self.cache_folder)
+		self.device = device
 		self.stats = stats
 
-	def load_from_disk(self, layer_idx, device="cuda:0"):
+	def load_from_disk(self, layer_idx):
 		path = f"{self.cache_folder}/layer_{layer_idx}.pt"
 		if not os.path.exists(path): return None
 		t1 = time.perf_counter()
-		tensors = torch.load(path, map_location=device)
+		tensors = torch.load(path, map_location=self.device)
 		if self.stats: self.stats.set("kvload", t1)
 		return tensors
 
@@ -29,9 +30,9 @@ class oCache:
 
 
 class KVCache(DynamicCache, oCache): #DiskCache
-	def __init__(self, cache_dir="./kv_cache", stats=None):
+	def __init__(self, cache_dir="./kv_cache", device="cuda:0", stats=None):
 		super().__init__()		
-		self.ini_ocache(cache_dir, stats)
+		self.ini_ocache(cache_dir, device, stats)
 
 	def update(
 		self,
