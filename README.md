@@ -16,7 +16,6 @@ oLLM is a lightweight Python library for large-context LLM inference, built on t
 <ul dir="auto">
 <li><code>AutoInference</code> with any Llama3 / gemma3 model + <a href="https://github.com/huggingface/peft">PEFT</a> adapter support</li>
 <li><code>kvikio</code> and <code>flash-attn</code> are optional now, meaning no hardware restrictions beyond HF transformers</li>
-<li><code>Llama3</code> models use original HF files now (make sure to delete the existing model folder(llama3-*) before running it)</li>
 <li>Multimodal <b>voxtral-small-24B</b> (audio+text) added. <a href="https://github.com/Mega4alik/ollm/blob/main/example_audio.py">[sample with audio]</a> </li>
 <li>Multimodal <b>gemma3-12B</b> (image+text) added. <a href="https://github.com/Mega4alik/ollm/blob/main/example_image.py">[sample with image]</a> </li>
 <li><b>qwen3-next-80B</b> (160GB model) added with <span style="color:blue">⚡️1tok/2s</span> throughput (our fastest model so far)</li>
