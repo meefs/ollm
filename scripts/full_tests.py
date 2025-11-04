@@ -50,9 +50,9 @@ for test_id in test_ids:
 		ans = run_test("4", "qwen3-next-80B", sm, um, kvcache="disk", offload_layers_to_cpu=48, max_new_tokens=100)
 		print("#4.TestSuccess")
 
-	if test_id==5: #5. qwen3-next-80B, make sure it runs without offloading and no DiskCache
+	if test_id==5: #5. qwen3-next-80B, make sure it generates proper output for 2k context
 		sm, um = "[CHATS]:\n"+file_get_contents("./samples/2k_sample.txt")+"[/END CHATS]", "Analyze chats above and write top 10 most popular questions (translate to english)."
-		ans = run_test("5", "qwen3-next-80B", sm, um, max_new_tokens=10)
+		ans = run_test("5", "qwen3-next-80B", sm, um, kvcache="disk", max_new_tokens=100)
 		print("#5.TestSuccess")
 
 	if test_id==6: #6. gemma3-12B, properly runs on 2k_sample, cpu_offloading(12 layers should be consuming ~7GB RAM)
