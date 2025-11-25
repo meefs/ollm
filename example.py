@@ -1,9 +1,9 @@
 from ollm import Inference, file_get_contents, TextStreamer
 
-o = Inference("llama3-1B-chat", device="cuda:0", logging=True) #llama3-1B-chat(3B, 8B) | gpt-oss-20B
-o.ini_model(models_dir="/media/mega4alik/ssd/models/", force_download=False)
+o = Inference("llama3-1B-chat", device="cuda:0", logging=True) #llama3-1B-chat(3B, 8B) | gpt-oss-20B | qwen3-next-80B
+o.ini_model(models_dir="./models/", force_download=False)
 o.offload_layers_to_cpu(layers_num=2) #offload some layers to CPU for speed increase
-past_key_values = o.DiskCache(cache_dir="/media/mega4alik/ssd/kv_cache/")
+past_key_values = o.DiskCache(cache_dir="./kv_cache/")
 text_streamer = TextStreamer(o.tokenizer, skip_prompt=True, skip_special_tokens=False)
 
 sm, um = "You are helpful AI assistant", "List planets starting from Mercury"
