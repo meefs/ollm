@@ -6,9 +6,9 @@
 
 from ollm import Inference, file_get_contents, TextStreamer
 o = Inference("voxtral-small-24B", device="cuda:0", logging=True, multimodality=True)
-o.ini_model(models_dir="/media/mega4alik/ssd2/models/", force_download=False)
+o.ini_model(models_dir="./models/", force_download=False)
 #o.offload_layers_to_cpu(layers_num=2) #offload some layers to CPU for speed boost
-past_key_values = None #o.DiskCache(cache_dir="/media/mega4alik/ssd/kv_cache/") #uncomment for large context
+past_key_values = None #o.DiskCache(cache_dir="./kv_cache/") #uncomment for large context
 text_streamer = TextStreamer(o.tokenizer, skip_prompt=True, skip_special_tokens=False)
 messages = [
     {
